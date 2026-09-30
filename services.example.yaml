@@ -1,0 +1,64 @@
+# ratecheck 示例配置：复制为 services.yaml 后按需修改
+# `ratecheck init` 会生成本文件。
+
+global:
+  report_days: 30
+  alert:
+    # 超过阈值时推送到这个 webhook（Slack / Discord / 自建均可，统一 JSON，含 text 字段）
+    webhook: "https://hooks.example.com/xxxx"
+    # 同一 (服务, 指标, 级别) 在此窗口内只告警一次
+    min_interval_minutes: 60
+    timeout_secs: 10
+
+services:
+  # ── OpenAI：dashboard billing（本月已花费，单位分 → 换算成美元）──
+  # 需要「组织 admin key」：https://platform.openai.com/api-keys
+  # 响应示例: {"total_usage": 12345.6, ...}（分）→ 存为 cost_usd（美元）
+  - name: openai
+    type: openai_billing
+    api_key_env: OPENAI_ADMIN_KEY   # 也可直接写 api_key: ${OPENAI_ADMIN_KEY}
+    limits:
+      - metric: cost_usd            # 本月成本（美元）
+        limit: 200
+        unit: usd
+    thresholds:
+      - metric: cost_usd
+        warn: 70
+        critical: 90
+
+  # ── 任意 JSON 用量 / 余额 API（DeepSeek、云 billing、自定义网关）──
+  # 例：DeepSeek GET https://api.deepseek.com/user/balance
+  #   {"is_available":true,"balance_infos":[{"currency":"CNY","total_balance":"110.00",...}]}
+  # invert: true → 值表示「剩余量」，用量 = limit - 值；普通累计用量不写。
+  - name: deepseek
+    type: generic_json
+    url: https://api.deepseek.com/user/balance
+    api_key_env: DEEPSEEK_API_KEY
+    field: balance_infos[0].total_balance
+    metric: balance_cny
+    scale: 1.0
+    invert: true
+    limits:
+      - metric: balance_cny
+        limit: 110
+        unit: CNY
+    thresholds:
+      - metric: balance_cny
+        warn: 80
+        critical: 92
+
+  # ── 本地 / 代理侧统计：proxy 端把 token 数记入 SQLite ──
+  # 用法: ratecheck record my-proxy tokens 523001
+  - name: my-proxy
+    type: manual
+    limits:
+      - metric: tokens
+        limit: 1000000
+        unit: tokens
+    cost_rates:
+      - metric: tokens
+        per_unit: 0.000002          # 每 token 2e-6 美元，用于成本估算
+    thresholds:
+      - metric: tokens
+        warn: 80
+        critical: 95

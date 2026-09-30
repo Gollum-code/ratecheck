@@ -1,0 +1,28 @@
+[package]
+name = "ratecheck"
+version = "0.1.0"
+edition = "2021"
+description = "API rate/limit monitoring CLI: track usage, alert on thresholds, report cost trends"
+license = "MIT"
+repository = "https://example.com/ratecheck"
+
+[[bin]]
+name = "ratecheck"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+lto = true
+strip = true
